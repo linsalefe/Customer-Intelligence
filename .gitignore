@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# Env
+.env
+.env.local
+
+# Data
+data/landing/*
+data/processed/*
+!data/landing/.gitkeep
+!data/processed/.gitkeep
+!data/samples/
+
+# Reports
+reports/qa/*
+reports/exports/*
+!reports/qa/.gitkeep
+!reports/exports/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite

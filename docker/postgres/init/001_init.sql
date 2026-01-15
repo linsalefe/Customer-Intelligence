@@ -1,0 +1,19 @@
+-- Enable extensions
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create schemas
+CREATE SCHEMA IF NOT EXISTS raw;
+CREATE SCHEMA IF NOT EXISTS stg;
+CREATE SCHEMA IF NOT EXISTS core;
+CREATE SCHEMA IF NOT EXISTS metrics;
+CREATE SCHEMA IF NOT EXISTS mart;
+CREATE SCHEMA IF NOT EXISTS audit;
+
+-- Grant permissions
+GRANT ALL ON SCHEMA raw TO postgres;
+GRANT ALL ON SCHEMA stg TO postgres;
+GRANT ALL ON SCHEMA core TO postgres;
+GRANT ALL ON SCHEMA metrics TO postgres;
+GRANT ALL ON SCHEMA mart TO postgres;
+GRANT ALL ON SCHEMA audit TO postgres;

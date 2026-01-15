@@ -1,0 +1,43 @@
+# Mapeamento de colunas por fonte
+
+rdstation:
+  encoding: utf-16
+  separator: "\t"
+  columns:
+    email: Email
+    name: Nome
+    phone: Telefone
+    mobile: Celular
+    company: Empresa
+    job_title: Cargo
+    city: Cidade
+    state: Estado
+    country: País
+    tags: Tags
+    lead_stage: Estágio no funil
+    lead_status: Status para comunicação por email
+    conversion_date: Data da primeira conversão
+    last_conversion: Data da última conversão
+    conversion_count: Total de conversões
+
+hotmart:
+  encoding: utf-8
+  columns:
+    transaction_id: Transação
+    product_name: Nome do Produto
+    status: Status
+    sale_date: Data de Venda
+    confirmation_date: Data de Confirmação
+    name: Nome
+    email: Email
+    document: Documento
+    phone: Telefone
+    ddd: DDD
+    city: Cidade
+    state: Estado
+    country: País
+    total_price: Preço Total
+    payment_type: Meio de Pagamento
+    currency: Moeda
+    producer_name: Nome do Produtor
+    affiliate_name: Nome do Afiliado
