@@ -1,20 +1,27 @@
 import psycopg2
 from pathlib import Path
 from src.db.connection import get_postgres_connection
+import time
 
 
 def execute_sql_file(filepath):
-    """Executa arquivo SQL"""
+    """Executa arquivo SQL com logs detalhados"""
     conn = get_postgres_connection()
     cursor = conn.cursor()
     
     try:
+        print(f"\n📄 Lendo arquivo: {filepath.name}")
         with open(filepath, 'r', encoding='utf-8') as f:
             sql = f.read()
         
+        print(f"⏳ Executando SQL... ({len(sql)} caracteres)")
+        start_time = time.time()
+        
         cursor.execute(sql)
         conn.commit()
-        print(f"✅ {filepath.name}")
+        
+        elapsed = time.time() - start_time
+        print(f"✅ {filepath.name} - Concluído em {elapsed:.2f}s")
         return True
         
     except Exception as e:
@@ -34,6 +41,7 @@ def execute_sql_folder(folder_path):
     
     print(f"\n{'='*60}")
     print(f"Executando SQLs de: {folder.name}")
+    print(f"Total de arquivos: {len(sql_files)}")
     print(f"{'='*60}")
     
     success_count = 0
