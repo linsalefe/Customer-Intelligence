@@ -15,5 +15,17 @@ services:
       - ./postgres/init:/docker-entrypoint-initdb.d
     restart: unless-stopped
 
+  metabase:
+    image: metabase/metabase:latest
+    container_name: customer360_bi
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    volumes:
+      - metabase_data:/metabase-data
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  metabase_data:
