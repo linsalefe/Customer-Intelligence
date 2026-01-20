@@ -2,7 +2,7 @@
 
 # Definição de cliente ativo/inativo
 customer_status:
-  active_days_threshold: 90  # Cliente ativo se comprou nos últimos 90 dias
+  active_days_threshold: 90
   recency_bands:
     - name: "0-30 dias"
       min: 0
@@ -22,9 +22,9 @@ customer_status:
 
 # RFM Segmentation
 rfm:
-  recency_scores: [1, 2, 3, 4, 5]  # 5 = mais recente
-  frequency_scores: [1, 2, 3, 4, 5]  # 5 = mais compras
-  monetary_scores: [1, 2, 3, 4, 5]  # 5 = maior valor
+  recency_scores: [1, 2, 3, 4, 5]
+  frequency_scores: [1, 2, 3, 4, 5]
+  monetary_scores: [1, 2, 3, 4, 5]
 
 # Status válidos de vendas
 valid_sales_status:
@@ -33,6 +33,9 @@ valid_sales_status:
   - Complete
   - approved
   - completed
+  - Concluído
+  - Gratuito
+  - Autorizado
 
 # Países válidos
 valid_countries:

@@ -1,4 +1,4 @@
--- Staging: Vendas normalizadas (Hotmart/Doit)
+-- Staging: Vendas normalizadas (Hotmart/Doity)
 DROP TABLE IF EXISTS stg.orders_unified CASCADE;
 
 CREATE TABLE stg.orders_unified AS
@@ -26,14 +26,20 @@ SELECT
     city,
     state,
     country,
-    CAST(REGEXP_REPLACE(total_price, '[^\d.]', '', 'g') AS DECIMAL(10,2)) as total_price_num,
+    -- Converte valores (trata vírgula brasileira)
+    CAST(
+        REPLACE(
+            REGEXP_REPLACE(total_price, '[^\d,.]', '', 'g'),
+            ',', '.'
+        ) AS DECIMAL(10,2)
+    ) as total_price_num,
     payment_type,
     currency,
     imported_at
 FROM raw.sales_orders
 WHERE email IS NOT NULL
   AND TRIM(email) != ''
-  AND status IN ('Aprovado', 'Completo', 'Complete', 'approved', 'completed');
+  AND status IN ('Aprovado', 'Completo', 'Complete', 'approved', 'completed', 'Concluído', 'Gratuito', 'Autorizado');
 
 -- Índices
 CREATE INDEX idx_stg_orders_email ON stg.orders_unified(email_norm);
@@ -47,7 +53,6 @@ SELECT
     'stg.orders_unified' as tabela,
     COUNT(*) as total_registros,
     COUNT(DISTINCT email_norm) as emails_unicos,
-    COUNT(DISTINCT transaction_id) as transacoes_unicas,
     MIN(sale_date_parsed) as primeira_venda,
     MAX(sale_date_parsed) as ultima_venda,
     SUM(total_price_num) as receita_total

@@ -1,0 +1,129 @@
+import os
+import json
+import hashlib
+from datetime import datetime
+from typing import Any, Optional, Dict
+
+from fastapi import FastAPI, Request, HTTPException
+from sqlalchemy import text
+
+from src.db.connection import get_sqlalchemy_engine
+
+app = FastAPI(title="Customer360 - Hotmart Webhook")
+
+HOTMART_HOTTOK = os.getenv("HOTMART_HOTTOK", "").strip()
+
+STATUS_MAP = {
+    "APPROVED": "Aprovado",
+    "COMPLETE": "Completo",
+    "COMPLETED": "Completo",
+    "CANCELLED": "Cancelado",
+    "CANCELED": "Cancelado",
+    "REFUNDED": "Reembolsado",
+    "CHARGEBACK": "Chargeback",
+    "EXPIRED": "Expirado",
+    "OVERDUE": "Atrasado",
+    "WAITING_PAYMENT": "Aguardando pagamento",
+    "AWAITING_PAYMENT": "Aguardando pagamento",
+}
+
+def _sha256_hex(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+def _get(d: Any, *path: str) -> Optional[Any]:
+    cur = d
+    for p in path:
+        if not isinstance(cur, dict) or p not in cur:
+            return None
+        cur = cur[p]
+    return cur
+
+def _extract_fields(payload: Dict[str, Any]) -> Dict[str, Optional[str]]:
+    event_type = payload.get("event") or _get(payload, "data", "event")
+    data = payload.get("data", {}) if isinstance(payload.get("data"), dict) else payload
+    purchase = data.get("purchase", {}) if isinstance(data.get("purchase"), dict) else data
+    buyer = data.get("buyer", {}) if isinstance(data.get("buyer"), dict) else {}
+    
+    transaction_id = purchase.get("transaction") or data.get("transaction_id")
+    status_raw = purchase.get("status") or data.get("status")
+    status_norm = STATUS_MAP.get(str(status_raw).upper(), str(status_raw) if status_raw else None)
+    
+    email = buyer.get("email") or data.get("email")
+    name = buyer.get("name") or data.get("name")
+    product_name = _get(data, "product", "name") or purchase.get("product_name")
+    
+    sale_date = purchase.get("order_date") or data.get("purchase_date")
+    confirmation_date = purchase.get("approval_date") or data.get("confirmation_date")
+    total_price = purchase.get("full_price") or purchase.get("price")
+    payment_type = purchase.get("payment_type")
+    currency = purchase.get("currency")
+    
+    return {
+        "event_type": str(event_type) if event_type else None,
+        "transaction_id": str(transaction_id) if transaction_id else None,
+        "status_norm": status_norm,
+        "email": str(email).lower().strip() if email else None,
+        "name": str(name).strip() if name else None,
+        "product_name": str(product_name).strip() if product_name else None,
+        "sale_date": str(sale_date) if sale_date else None,
+        "confirmation_date": str(confirmation_date) if confirmation_date else None,
+        "total_price": str(total_price) if total_price else None,
+        "payment_type": str(payment_type) if payment_type else None,
+        "currency": str(currency) if currency else None,
+    }
+
+@app.get("/health")
+def health():
+    return {"ok": True, "ts": datetime.utcnow().isoformat()}
+
+@app.post("/webhooks/hotmart")
+async def hotmart_webhook(request: Request):
+    print("🔔 Webhook recebido!")
+    
+    hottok = (request.headers.get("x-hotmart-hottok") or "").strip()
+    print(f"Token recebido: {hottok[:10]}...")
+    print(f"Token esperado: {HOTMART_HOTTOK[:10]}...")
+    
+    if not HOTMART_HOTTOK:
+        raise HTTPException(status_code=500, detail="HOTMART_HOTTOK não configurado")
+    if hottok != HOTMART_HOTTOK:
+        raise HTTPException(status_code=401, detail="Token inválido")
+    
+    raw_body = await request.body()
+    payload_hash = _sha256_hex(raw_body)
+    
+    try:
+        payload = await request.json()
+        print(f"📦 Payload: {json.dumps(payload, indent=2)}")
+    except Exception as e:
+        print(f"❌ Erro ao parsear JSON: {e}")
+        payload = {"raw": raw_body.decode("utf-8", errors="replace")}
+    
+    fields = _extract_fields(payload)
+    print(f"✅ Campos extraídos: {fields}")
+    
+    engine = get_sqlalchemy_engine()
+    
+    try:
+        # Salvar evento (auditoria)
+        with engine.begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO raw.hotmart_events (event_type, transaction_id, email, payload, payload_hash)
+                    VALUES (:event_type, :transaction_id, :email, CAST(:payload AS JSONB), :payload_hash)
+                    ON CONFLICT (payload_hash) DO NOTHING
+                """),
+                {
+                    "event_type": fields["event_type"],
+                    "transaction_id": fields["transaction_id"],
+                    "email": fields["email"],
+                    "payload": json.dumps(payload, ensure_ascii=False),
+                    "payload_hash": payload_hash,
+                }
+            )
+        print("✅ Evento salvo em raw.hotmart_events")
+    except Exception as e:
+        print(f"❌ Erro ao salvar evento: {e}")
+        raise
+    
+    return {"ok": True}

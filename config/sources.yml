@@ -41,3 +41,18 @@ hotmart:
     currency: Moeda
     producer_name: Nome do Produtor
     affiliate_name: Nome do Afiliado
+
+doity:
+  encoding: utf-8
+  columns:
+    inscription_id: Nº Inscrição
+    purchase_id: Nº compra
+    name: Nome
+    email: E-mail
+    value: Valor
+    inscription_date: Data da inscrição
+    inscription_status: Situação da inscrição
+    purchase_status: Situação da compra
+    state: Em qual estado você mora?
+    profession: Qual é sua profissão?
+    phone: Se quiser, você pode receber a confirmação da sua inscrição pelo WhatsApp. Basta informar seu telefone.

@@ -114,3 +114,71 @@ def load_hotmart_to_raw(excel_file):
     
     print(f"✅ {len(df_mapped)} registros inseridos em raw.sales_orders")
     return len(df_mapped)
+
+
+def load_doity_to_raw(folder_path):
+    """Carrega múltiplos arquivos Excel da Doity para raw.sales_orders"""
+    print(f"\n{'='*60}")
+    print(f"Importando Doity: {folder_path}")
+    print(f"{'='*60}")
+    
+    config = load_config('config/sources.yml')
+    doity_config = config['doity']
+    
+    folder = Path(folder_path)
+    excel_files = list(folder.glob("*.xlsx"))
+    
+    print(f"✅ Encontrados {len(excel_files)} arquivos")
+    
+    all_data = []
+    
+    for excel_file in excel_files:
+        try:
+            df = pd.read_excel(excel_file)
+            print(f"  → {excel_file.name}: {len(df)} registros")
+            all_data.append(df)
+        except Exception as e:
+            print(f"  ⚠️  Erro em {excel_file.name}: {str(e)}")
+    
+    # Concatena todos
+    df_all = pd.concat(all_data, ignore_index=True)
+    print(f"\n✅ Total consolidado: {len(df_all)} registros")
+    
+    col_map = doity_config['columns']
+    
+    # Mapeia para formato padrão
+    df_mapped = pd.DataFrame({
+        'source': 'doity',
+        'transaction_id': df_all[col_map['purchase_id']].astype(str) if col_map['purchase_id'] in df_all.columns else None,
+        'product_name': 'Evento Doity',  # Genérico por enquanto
+        'status': df_all[col_map['purchase_status']] if col_map['purchase_status'] in df_all.columns else None,
+        'sale_date': df_all[col_map['inscription_date']] if col_map['inscription_date'] in df_all.columns else None,
+        'confirmation_date': df_all[col_map['inscription_date']] if col_map['inscription_date'] in df_all.columns else None,
+        'name': df_all[col_map['name']] if col_map['name'] in df_all.columns else None,
+        'email': df_all[col_map['email']] if col_map['email'] in df_all.columns else None,
+        'document': None,  # Doity não tem documento
+        'phone': df_all[col_map['phone']].astype(str) if col_map['phone'] in df_all.columns else None,
+        'ddd': None,
+        'city': None,
+        'state': df_all[col_map['state']] if col_map['state'] in df_all.columns else None,
+        'country': 'Brasil',
+        'total_price': df_all[col_map['value']].astype(str) if col_map['value'] in df_all.columns else None,
+        'payment_type': 'Doity',
+        'currency': 'BRL',
+        'producer_name': 'CENAT',
+        'affiliate_name': None,
+    })
+    
+    engine = get_sqlalchemy_engine()
+    
+    df_mapped.to_sql(
+        'sales_orders',
+        engine,
+        schema='raw',
+        if_exists='append',
+        index=False,
+        chunksize=1000
+    )
+    
+    print(f"✅ {len(df_mapped)} registros inseridos em raw.sales_orders")
+    return len(df_mapped)

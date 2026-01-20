@@ -1,14 +1,12 @@
--- Mart: KPIs principais para dashboard
+-- Mart: KPIs principais (SEM LEADS)
 DROP VIEW IF EXISTS mart.overview_kpis CASCADE;
 
 CREATE VIEW mart.overview_kpis AS
 SELECT
-    -- Clientes
-    (SELECT COUNT(*) FROM core.customer) as total_clientes,
+    -- Clientes (só quem comprou)
     (SELECT COUNT(*) FROM metrics.customer_summary WHERE total_orders > 0) as total_compradores,
     (SELECT COUNT(*) FROM metrics.customer_summary WHERE is_active) as clientes_ativos,
     (SELECT COUNT(*) FROM metrics.customer_summary WHERE NOT is_active AND total_orders > 0) as clientes_inativos,
-    (SELECT COUNT(*) FROM metrics.customer_summary WHERE total_orders = 0) as leads_nao_convertidos,
     
     -- Financeiro
     (SELECT ROUND(SUM(total_price), 2) FROM core.orders) as receita_total,
@@ -24,5 +22,4 @@ SELECT
     (SELECT MIN(sale_date)::date FROM core.orders) as primeira_venda,
     (SELECT MAX(sale_date)::date FROM core.orders) as ultima_venda;
 
--- Teste
 SELECT * FROM mart.overview_kpis;
