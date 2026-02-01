@@ -5,11 +5,27 @@ from datetime import datetime
 from typing import Any, Optional, Dict
 
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from src.db.connection import get_sqlalchemy_engine
+from src.webhook_api.auth_router import router as auth_router
+from src.webhook_api.dashboard_router import router as dashboard_router
+from src.webhook_api.users_router import router as users_router
 
-app = FastAPI(title="Customer360 - Hotmart Webhook")
+app = FastAPI(title="Customer360 API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router)
+app.include_router(dashboard_router)
+app.include_router(users_router)
 
 HOTMART_HOTTOK = os.getenv("HOTMART_HOTTOK", "").strip()
 
@@ -78,11 +94,7 @@ def health():
 
 @app.post("/webhooks/hotmart")
 async def hotmart_webhook(request: Request):
-    print("🔔 Webhook recebido!")
-    
     hottok = (request.headers.get("x-hotmart-hottok") or "").strip()
-    print(f"Token recebido: {hottok[:10]}...")
-    print(f"Token esperado: {HOTMART_HOTTOK[:10]}...")
     
     if not HOTMART_HOTTOK:
         raise HTTPException(status_code=500, detail="HOTMART_HOTTOK não configurado")
@@ -94,36 +106,26 @@ async def hotmart_webhook(request: Request):
     
     try:
         payload = await request.json()
-        print(f"📦 Payload: {json.dumps(payload, indent=2)}")
-    except Exception as e:
-        print(f"❌ Erro ao parsear JSON: {e}")
+    except Exception:
         payload = {"raw": raw_body.decode("utf-8", errors="replace")}
     
     fields = _extract_fields(payload)
-    print(f"✅ Campos extraídos: {fields}")
-    
     engine = get_sqlalchemy_engine()
     
-    try:
-        # Salvar evento (auditoria)
-        with engine.begin() as conn:
-            conn.execute(
-                text("""
-                    INSERT INTO raw.hotmart_events (event_type, transaction_id, email, payload, payload_hash)
-                    VALUES (:event_type, :transaction_id, :email, CAST(:payload AS JSONB), :payload_hash)
-                    ON CONFLICT (payload_hash) DO NOTHING
-                """),
-                {
-                    "event_type": fields["event_type"],
-                    "transaction_id": fields["transaction_id"],
-                    "email": fields["email"],
-                    "payload": json.dumps(payload, ensure_ascii=False),
-                    "payload_hash": payload_hash,
-                }
-            )
-        print("✅ Evento salvo em raw.hotmart_events")
-    except Exception as e:
-        print(f"❌ Erro ao salvar evento: {e}")
-        raise
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO raw.hotmart_events (event_type, transaction_id, email, payload, payload_hash)
+                VALUES (:event_type, :transaction_id, :email, CAST(:payload AS JSONB), :payload_hash)
+                ON CONFLICT (payload_hash) DO NOTHING
+            """),
+            {
+                "event_type": fields["event_type"],
+                "transaction_id": fields["transaction_id"],
+                "email": fields["email"],
+                "payload": json.dumps(payload, ensure_ascii=False),
+                "payload_hash": payload_hash,
+            }
+        )
     
     return {"ok": True}
