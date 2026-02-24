@@ -24,3 +24,10 @@ DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NA
 
 # Business Rules
 ACTIVE_DAYS_THRESHOLD = int(os.getenv("ACTIVE_DAYS_THRESHOLD", "90"))
+
+# Communication Channels
+COMTELE_API_KEY = os.getenv("COMTELE_API_KEY", "")
+RDSTATION_API_KEY = os.getenv("RDSTATION_API_KEY", "")
+EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL", "")
+EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY", "")
+EVOLUTION_INSTANCE_NAME = os.getenv("EVOLUTION_INSTANCE_NAME", "")

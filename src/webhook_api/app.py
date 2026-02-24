@@ -12,6 +12,8 @@ from src.db.connection import get_sqlalchemy_engine
 from src.webhook_api.auth_router import router as auth_router
 from src.webhook_api.dashboard_router import router as dashboard_router
 from src.webhook_api.users_router import router as users_router
+from src.webhook_api.messaging_router import router as messaging_router
+from src.webhook_api.whatsapp_router import router as whatsapp_router
 
 app = FastAPI(title="Customer360 API")
 
@@ -26,6 +28,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(users_router)
+app.include_router(messaging_router)
+app.include_router(whatsapp_router)
 
 HOTMART_HOTTOK = os.getenv("HOTMART_HOTTOK", "").strip()
 

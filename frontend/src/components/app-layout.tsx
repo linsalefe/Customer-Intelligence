@@ -11,6 +11,8 @@ import {
   TrendingUp,
   Settings,
   LogOut,
+  MessageSquare,
+  Smartphone,
   Menu,
   X,
   ChevronLeft,
@@ -31,6 +33,8 @@ const navItems: NavItem[] = [
   { label: "Top Clientes", href: "/top-clientes", icon: <Trophy className="w-5 h-5" />, roles: ["admin", "operacional", "viewer"] },
   { label: "Receita", href: "/receita", icon: <TrendingUp className="w-5 h-5" />, roles: ["admin", "operacional", "viewer"] },
   { label: "Cohort", href: "/cohort", icon: <LayoutGrid className="w-5 h-5" />, roles: ["admin", "operacional"] },
+  { label: "Mensagens", href: "/mensagens", icon: <MessageSquare className="w-5 h-5" />, roles: ["admin", "operacional"] },
+  { label: "WhatsApp", href: "/whatsapp", icon: <Smartphone className="w-5 h-5" />, roles: ["admin"] },
   { label: "Usuários", href: "/usuarios", icon: <Settings className="w-5 h-5" />, roles: ["admin"] },
 ];
 

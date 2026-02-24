@@ -29,6 +29,11 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       JWT_SECRET_KEY: customer360-prod-secret-change-me
+      COMTELE_API_KEY: "${COMTELE_API_KEY}"
+      RDSTATION_API_KEY: "${RDSTATION_API_KEY}"
+      EVOLUTION_API_URL: "${EVOLUTION_API_URL}"
+      EVOLUTION_API_KEY: "${EVOLUTION_API_KEY}"
+      EVOLUTION_INSTANCE_NAME: "${EVOLUTION_INSTANCE_NAME}"
     ports:
       - "8001:8001"
     restart: unless-stopped

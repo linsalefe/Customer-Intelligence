@@ -1,0 +1,22 @@
+# Configuração dos canais de comunicação
+
+sms:
+  provider: comtele
+  base_url: https://api.comtele.com.br/v2
+  api_key: "${COMTELE_API_KEY}"
+  max_chars: 160
+  enabled: true
+
+email:
+  provider: rdstation
+  base_url: https://api.rd.services
+  api_key: "${RDSTATION_API_KEY}"
+  from_name: "CENAT"
+  enabled: true
+
+whatsapp:
+  provider: evolution
+  base_url: "${EVOLUTION_API_URL}"
+  api_key: "${EVOLUTION_API_KEY}"
+  instance_name: "${EVOLUTION_INSTANCE_NAME}"
+  enabled: true
