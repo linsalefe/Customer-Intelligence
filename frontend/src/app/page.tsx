@@ -220,7 +220,7 @@ export default function DashboardPage() {
                 <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#9ca3af" }} />
                 <YAxis tick={{ fontSize: 12, fill: "#9ca3af" }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
-                  formatter={(value: number) => [formatCurrency(value), "Receita"]}
+                  formatter={(value: any) => [formatCurrency(Number(value)), "Receita"]}
                   contentStyle={{ borderRadius: "12px", border: "1px solid #e5e7eb" }}
                 />
                 <Line type="monotone" dataKey="receita_total" stroke="#2A658F" strokeWidth={2.5} dot={{ r: 4, fill: "#2A658F" }} />
@@ -238,7 +238,7 @@ export default function DashboardPage() {
                 <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#9ca3af" }} />
                 <YAxis tick={{ fontSize: 12, fill: "#9ca3af" }} />
                 <Tooltip
-                  formatter={(value: number) => [formatNumber(value), "Pedidos"]}
+                  formatter={(value: any) => [formatNumber(Number(value)), "Pedidos"]}
                   contentStyle={{ borderRadius: "12px", border: "1px solid #e5e7eb" }}
                 />
                 <Bar dataKey="total_pedidos" fill="#2A658F" radius={[6, 6, 0, 0]} />

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import AppLayout from "@/components/app-layout";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import {
   Search, Filter, ChevronLeft, ChevronRight, X,
-  ShoppingCart, Calendar, CreditCard, Package, User,
-  Phone, Mail, MapPin,
+  ShoppingCart, Calendar, CreditCard, Package,
+  Phone, Mail, MapPin, Download, FileSpreadsheet, FileText,
 } from "lucide-react";
 
 interface Client {
@@ -30,10 +30,9 @@ interface Order {
   product_name: string;
   sale_date: string;
   total_price: number;
-  original_price: number;
-  original_currency: string;
   payment_type: string;
   source: string;
+  currency: string;
 }
 
 interface CustomerDetail {
@@ -50,9 +49,14 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [segment, setSegment] = useState("");
+  const [product, setProduct] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [minRevenue, setMinRevenue] = useState("");
+  const [maxRevenue, setMaxRevenue] = useState("");
+  const [products, setProducts] = useState<string[]>([]);
   const [offset, setOffset] = useState(0);
   const [mounted, setMounted] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
+  const [exporting, setExporting] = useState(false);
   const limit = 50;
 
   // Drawer state
@@ -62,11 +66,21 @@ export default function ClientesPage() {
 
   useEffect(() => setMounted(true), []);
 
+  // Carregar produtos para o filtro
+  useEffect(() => {
+    api.get("/api/dashboard/products")
+      .then(res => setProducts(res.data.products || []))
+      .catch(() => {});
+  }, []);
+
   const loadData = async () => {
     setLoading(true);
     try {
       const params: Record<string, string | number> = { limit, offset };
       if (segment) params.segment = segment;
+      if (product) params.product = product;
+      if (productSearch) params.product_search = productSearch;
+      if (productSearch) params.product_search = productSearch;
       const res = await api.get("/api/dashboard/active-inactive", { params });
       setClients(res.data.data);
     } catch {
@@ -78,7 +92,7 @@ export default function ClientesPage() {
 
   useEffect(() => {
     loadData();
-  }, [segment, offset]);
+  }, [segment, product, productSearch, offset]);
 
   const openDrawer = async (customerId: number) => {
     setDrawerOpen(true);
@@ -97,6 +111,129 @@ export default function ClientesPage() {
   const closeDrawer = () => {
     setDrawerOpen(false);
     setSelectedClient(null);
+  };
+
+  // Exportar dados
+  const exportData = async (format: "excel" | "pdf") => {
+    setExporting(true);
+    try {
+      const params: Record<string, string> = {};
+      if (segment) params.segment = segment;
+      if (product) params.product = product;
+      if (productSearch) params.product_search = productSearch;
+      if (minRevenue) params.min_revenue = minRevenue;
+      if (maxRevenue) params.max_revenue = maxRevenue;
+
+      const res = await api.get("/api/dashboard/export/customers", { params });
+      const data = res.data.data;
+
+      if (data.length === 0) {
+        toast.error("Nenhum dado para exportar");
+        return;
+      }
+
+      if (format === "excel") {
+        exportToExcel(data);
+      } else {
+        exportToPDF(data);
+      }
+      
+      toast.success(`${data.length} clientes exportados com sucesso!`);
+    } catch {
+      toast.error("Erro ao exportar dados");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const exportToExcel = (data: any[]) => {
+    const headers = ["Nome", "Email", "Telefone", "Cidade", "Estado", "Pedidos", "Receita", "Ticket Médio", "Status", "Última Compra", "Recência"];
+    const csvContent = [
+      headers.join(";"),
+      ...data.map(row => [
+        row.nome || "",
+        row.email || "",
+        row.telefone || "",
+        row.cidade || "",
+        row.estado || "",
+        row.pedidos || 0,
+        (row.receita || 0).toFixed(2).replace(".", ","),
+        (row.ticket_medio || 0).toFixed(2).replace(".", ","),
+        row.status || "",
+        row.ultima_compra || "",
+        row.recencia || ""
+      ].join(";"))
+    ].join("\n");
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `clientes_${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+  };
+
+  const exportToPDF = (data: any[]) => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Relatório de Clientes - Customer 360</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #27273D; font-size: 24px; margin-bottom: 5px; }
+          .subtitle { color: #666; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th { background: #27273D; color: white; padding: 10px 8px; text-align: left; }
+          td { padding: 8px; border-bottom: 1px solid #eee; }
+          tr:nth-child(even) { background: #f9f9f9; }
+          .status-ativo { color: #059669; font-weight: bold; }
+          .status-inativo { color: #ea580c; font-weight: bold; }
+          .total { margin-top: 20px; font-size: 14px; color: #666; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>Relatório de Clientes</h1>
+        <p class="subtitle">Customer 360 CENAT - Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Telefone</th>
+              <th>UF</th>
+              <th>Pedidos</th>
+              <th>Receita</th>
+              <th>Status</th>
+              <th>Recência</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map(row => `
+              <tr>
+                <td>${row.nome || "-"}</td>
+                <td>${row.email || "-"}</td>
+                <td>${row.telefone || "-"}</td>
+                <td>${row.estado || "-"}</td>
+                <td>${row.pedidos || 0}</td>
+                <td>R$ ${(row.receita || 0).toFixed(2).replace(".", ",")}</td>
+                <td class="status-${(row.status || "").toLowerCase()}">${row.status || "-"}</td>
+                <td>${row.recencia || "-"}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+        <p class="total">Total: ${data.length} clientes</p>
+        <script>window.onload = function() { window.print(); }</script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const filtered = search
@@ -127,61 +264,136 @@ export default function ClientesPage() {
     return styles[source] || "bg-gray-100 text-gray-600";
   };
 
+  const clearFilters = () => {
+    setSegment("");
+    setProduct("");
+    setProductSearch("");
+    setMinRevenue("");
+    setMaxRevenue("");
+    setSearch("");
+    setOffset(0);
+  };
+
+  const hasFilters = segment || product || productSearch || minRevenue || maxRevenue;
+
   return (
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div
-          className={`transition-all duration-700 ${
-            mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
-          }`}
-        >
-          <p className="text-sm font-medium text-[#2A658F] mb-1">Gestão</p>
-          <h1 className="text-2xl font-semibold text-[#27273D]">Clientes</h1>
+        <div className={`flex justify-between items-start transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"}`}>
+          <div>
+            <p className="text-sm font-medium text-[#2A658F] mb-1">Gestão</p>
+            <h1 className="text-2xl font-semibold text-[#27273D]">Clientes</h1>
+          </div>
+          
+          {/* Export Buttons */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => exportData("excel")}
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-all disabled:opacity-50"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Excel
+            </button>
+            <button
+              onClick={() => exportData("pdf")}
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-all disabled:opacity-50"
+            >
+              <FileText className="w-4 h-4" />
+              PDF
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
-        <div
-          className={`flex flex-col sm:flex-row gap-4 transition-all duration-700 ${
-            mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-          }`}
-          style={{ transitionDelay: "100ms" }}
-        >
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por nome ou email..."
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#2A658F] focus:ring-1 focus:ring-[#2A658F] transition-all duration-200 bg-white"
-            />
-          </div>
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <select
-              value={segment}
-              onChange={(e) => {
-                setSegment(e.target.value);
-                setOffset(0);
-              }}
-              className="pl-10 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#2A658F] bg-white appearance-none cursor-pointer"
-            >
-              <option value="">Todos os segmentos</option>
-              <option value="Ativo">Ativos</option>
-              <option value="Inativo">Inativos</option>
-              
-            </select>
+        <div className={`bg-white rounded-2xl border border-gray-100 p-4 transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`} style={{ transitionDelay: "100ms" }}>
+          <div className="flex flex-wrap gap-4">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar por nome ou email..."
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#2A658F] focus:ring-1 focus:ring-[#2A658F] transition-all duration-200 bg-white"
+              />
+            </div>
+
+            {/* Segment Filter */}
+            <div className="relative min-w-[150px]">
+              <select
+                value={segment}
+                onChange={(e) => { setSegment(e.target.value); setOffset(0); }}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#2A658F] bg-white appearance-none cursor-pointer"
+              >
+                <option value="">Status</option>
+                <option value="Ativo">Ativos</option>
+                <option value="Inativo">Inativos</option>
+              </select>
+            </div>
+
+            {/* Product Filter */}
+            <div className="relative min-w-[200px]">
+              <select
+                value={product}
+                onChange={(e) => { setProduct(e.target.value); setProductSearch(""); setOffset(0); }}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#2A658F] bg-white appearance-none cursor-pointer"
+              >
+                <option value="">Todos os produtos</option>
+                {products.map((p) => (
+                  <option key={p} value={p}>{p.length > 50 ? p.substring(0, 50) + "..." : p}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Product Search */}
+            <div className="relative min-w-[180px]">
+              <input
+                type="text"
+                value={productSearch}
+                onChange={(e) => { setProductSearch(e.target.value); setProduct(""); setOffset(0); }}
+                placeholder="Buscar produto..."
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#2A658F] bg-white"
+              />
+            </div>
+
+            {/* Revenue Range */}
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={minRevenue}
+                onChange={(e) => setMinRevenue(e.target.value)}
+                placeholder="R$ Min"
+                className="w-24 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#2A658F] bg-white"
+              />
+              <span className="text-gray-400">-</span>
+              <input
+                type="number"
+                value={maxRevenue}
+                onChange={(e) => setMaxRevenue(e.target.value)}
+                placeholder="R$ Max"
+                className="w-24 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#2A658F] bg-white"
+              />
+            </div>
+
+            {/* Clear Filters */}
+            {hasFilters && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+                Limpar filtros
+              </button>
+            )}
           </div>
         </div>
 
         {/* Table */}
-        <div
-          className={`bg-white rounded-2xl border border-gray-100 overflow-hidden transition-all duration-700 ${
-            mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-          }`}
-          style={{ transitionDelay: "200ms" }}
-        >
+        <div className={`bg-white rounded-2xl border border-gray-100 overflow-hidden transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`} style={{ transitionDelay: "200ms" }}>
           {loading ? (
             <div className="p-12 flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2A658F]" />
@@ -396,11 +608,6 @@ export default function ClientesPage() {
                                 <p className="text-sm font-semibold text-[#27273D]">
                                   {formatCurrency(order.total_price)}
                                 </p>
-                                {order.original_currency && order.original_currency !== "BRL" && (
-                                  <p className="text-[10px] text-gray-400">
-                                    Original: {order.original_price} {order.original_currency}
-                                  </p>
-                                )}
                               </div>
                             </div>
                           </div>

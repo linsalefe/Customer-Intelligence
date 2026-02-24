@@ -134,7 +134,7 @@ export default function ReceitaPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#9ca3af" }} />
                   <YAxis tick={{ fontSize: 12, fill: "#9ca3af" }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(value: number) => [formatCurrency(value), "Receita"]} contentStyle={{ borderRadius: "12px", border: "1px solid #e5e7eb" }} />
+                  <Tooltip formatter={(value: any) => [formatCurrency(value), "Receita"]} contentStyle={{ borderRadius: "12px", border: "1px solid #e5e7eb" }} />
                   <Area type="monotone" dataKey="receita_total" stroke="#2A658F" strokeWidth={2.5} fill="url(#colorReceita)" />
                 </AreaChart>
               </ResponsiveContainer>

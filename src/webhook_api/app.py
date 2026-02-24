@@ -17,7 +17,7 @@ app = FastAPI(title="Customer360 API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://100.24.2.187:3001", "http://cenatdata.online", "https://cenatdata.online", "http://www.cenatdata.online", "https://www.cenatdata.online"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
