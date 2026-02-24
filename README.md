@@ -2,18 +2,28 @@
 
 Sistema completo de inteligência de clientes com deduplicação, métricas RFM, dashboards interativos e gestão de usuários.
 
-## 📊 Status Atual
+## 📊 Status Atual (Fev/2026)
 
-- **18.971 compradores** únicos identificados
-- **25.129 pedidos** processados (deduplicados)
-- **R$ 2,6M** em receita total (com conversão de 12 moedas)
-- **852 clientes ativos** nos últimos 90 dias
+- **40.526 compradores** únicos identificados
+- **79.791 pedidos** processados (deduplicados)
+- **R$ 17,5M** em receita total (com conversão de 12 moedas)
+- **18.894 clientes ativos** nos últimos 365 dias
 - **Frontend completo** com 7 páginas interativas
+- **Domínio:** https://cenatdata.online
+
+## 🗃️ Fontes de Dados
+
+| Fonte | Registros | Receita | Descrição |
+|-------|-----------|---------|-----------|
+| **Pós-graduação** | 1.823 | R$ 9,7M | Cursos de especialização |
+| **Hotmart** | 13.013 | R$ 7,5M | Cursos e eventos online |
+| **Doity** | 64.706 | R$ 5,6M | Congressos e seminários |
+| **Intercâmbio** | 270 | R$ 813K | Programas internacionais |
 
 ## 🏗️ Arquitetura
 ```
 ┌─────────────┐
-│   SOURCES   │  RD Station (42k leads) + Hotmart (13k vendas) + Doity
+│   SOURCES   │  RD Station + Hotmart + Doity + Pós + Intercâmbio
 └──────┬──────┘
        │
        ▼
@@ -62,18 +72,29 @@ Sistema completo de inteligência de clientes com deduplicação, métricas RFM,
 | API | FastAPI + JWT + SQLAlchemy |
 | Frontend | Next.js 14 + TypeScript + Tailwind CSS v4 + Recharts |
 | Infraestrutura | Docker + Docker Compose |
+| Servidor | AWS Lightsail (Ubuntu 24) |
+| SSL | Let's Encrypt (auto-renovação) |
 
 ## 📱 Páginas do Dashboard
 
 | Página | Descrição |
 |--------|-----------|
 | **Dashboard** | KPIs principais, gráficos de receita e pedidos |
-| **Clientes** | Lista de compradores com histórico de compras |
+| **Clientes** | Lista com filtros por produto, status, busca + exportação Excel/PDF |
 | **Reativação** | Lista priorizada por score (0-200) com export CSV |
 | **Top Clientes** | Ranking por LTV com pódio visual |
 | **Receita** | Gráficos temporais de receita, pedidos e novos clientes |
 | **Cohort** | Análise de retenção e receita por cohort mensal |
 | **Usuários** | CRUD de usuários com perfis (Admin/Operacional/Viewer) |
+
+## 🔍 Filtros da Página Clientes
+
+- **Busca por nome/email** - busca instantânea
+- **Status** - Ativo / Inativo
+- **Produto exato** - dropdown com todos os produtos
+- **Busca por produto** - palavra-chave (ex: "Seminário", "Congresso")
+- **Faixa de receita** - valor mínimo e máximo
+- **Exportação** - Excel (CSV) e PDF com filtros aplicados
 
 ## 👥 Perfis de Acesso
 
@@ -82,6 +103,21 @@ Sistema completo de inteligência de clientes com deduplicação, métricas RFM,
 | **Admin** | Acesso total + gerenciar usuários |
 | **Operacional** | Dashboard + Clientes + Reativação + Cohort |
 | **Viewer** | Apenas visualização de dashboards |
+
+## 📈 KPIs Atuais
+```
+👥 40.526 compradores
+✅ 18.894 ativos (últimos 365 dias)
+❌ 21.632 inativos
+
+💰 R$ 17,5M receita total
+🎫 R$ 219 ticket médio
+💎 R$ 432 LTV médio
+
+📦 79.791 pedidos
+📅 318 vendas últimos 30 dias
+💱 12 moedas convertidas para BRL
+```
 
 ## 🚀 Setup Local
 
@@ -114,31 +150,37 @@ npm run dev -- -p 3001
 - **API:** http://localhost:8001
 - **Login:** admin@cenat.com / admin123
 
-## 🐳 Deploy com Docker
+## 🐳 Deploy Produção
+
+### Servidor AWS Lightsail
 ```bash
 cd docker
 docker-compose -f docker-compose.prod.yml up -d --build
 ```
 
-Serviços:
+### Serviços
 - **PostgreSQL** → porta 5433
 - **API FastAPI** → porta 8001
 - **Frontend Next.js** → porta 3001
+- **Nginx** → portas 80/443 (reverse proxy + SSL)
 
-## 📈 KPIs Atuais
-```
-👥 18.971 compradores
-✅ 852 ativos (últimos 90 dias)
-❌ 18.119 inativos
+### Domínio
+- **URL:** https://cenatdata.online
+- **SSL:** Let's Encrypt (renovação automática via certbot)
 
-💰 R$ 2,6M receita total
-🎫 R$ 105 ticket médio
-💎 R$ 139 LTV médio
+## 📊 Regras de Negócio
 
-📦 25.129 pedidos (deduplicados)
-📅 307 vendas últimos 30 dias
-💱 12 moedas convertidas para BRL
-```
+### Cliente Ativo
+- Comprou nos últimos **365 dias** (12 meses)
+- Alinhado com ciclo anual de eventos
+
+### Score de Reativação (0-200)
+- **Recência:** 366-545 dias = 100pts | 546-730 = 80pts | 730+ = 60pts
+- **Frequência:** 5+ pedidos = 50pts | 3-4 = 30pts | 2 = 20pts | 1 = 10pts
+- **Monetário:** R$1000+ = 50pts | R$500-999 = 30pts | R$200-499 = 20pts | <R$200 = 10pts
+
+### Conversão de Moedas
+- BRL: 1.0 | USD: 5.80 | EUR: 6.30 | COP: 0.0014 | ARS: 0.0055 | CLP: 0.006
 
 ## 🔧 CLI
 ```bash
@@ -153,7 +195,13 @@ python -m src.main full-refresh     # Pipeline completo
 ```
 Customer-Intelligence/
 ├── config/                  # Configurações (sources.yml, business_rules.yml)
-├── data/                    # Dados (landing, processed)
+├── data/
+│   └── landing/
+│       ├── doity/           # 96 arquivos de congressos
+│       ├── hotmart/         # Vendas Hotmart
+│       ├── intercâmbio/     # Participantes intercâmbio
+│       ├── pós/             # Alunos pós-graduação
+│       └── rdstation/       # Leads RD Station
 ├── docker/                  # Docker configs
 │   ├── docker-compose.yml
 │   ├── docker-compose.prod.yml
