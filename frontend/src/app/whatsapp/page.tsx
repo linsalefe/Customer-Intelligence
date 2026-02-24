@@ -389,7 +389,7 @@ export default function WhatsAppPage() {
   // === MAIN CHAT ===
   return (
     <AppLayout>
-      <div className="flex h-full">
+      <div className="flex" style={{ height: "calc(100vh - 48px)", marginTop: "-24px", marginLeft: "-24px", marginRight: "-24px", marginBottom: "-24px" }}>
 
         {/* SIDEBAR CONTATOS */}
         <div className={`${selectedContact ? "hidden lg:flex" : "flex"} w-full lg:w-[350px] flex-col border-r border-[#2a3942] bg-[#111b21] flex-shrink-0`}>
