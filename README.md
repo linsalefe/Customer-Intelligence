@@ -249,4 +249,4 @@ Customer-Intelligence/
 
 ## 👨‍💻 Desenvolvido por
 
-Alefe Guimarães Barbosa
+Alefe Guimel Lins Barbosa
