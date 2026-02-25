@@ -518,13 +518,33 @@ def send_media_message(req: SendMediaRequest):
 
 
 @router.get("/media/{media_id}")
+@router.get("/media/{media_id}")
 def get_media_file(media_id: str):
     """Proxy de mídia da Evolution API."""
     from src.connectors.evolution_client import fetch_media
     from fastapi.responses import Response
     import base64
     try:
-        data = fetch_media(media_id)
+        # Buscar info da mensagem no banco para obter remote_jid e fromMe
+        conn = get_postgres_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT contact_wa_id, direction FROM comm.wa_messages
+            WHERE wa_message_id = %s
+               OR content LIKE %s
+            LIMIT 1
+        """, (media_id, f"media:{media_id}%"))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        remote_jid = None
+        from_me = False
+        if row:
+            remote_jid = f"{row[0]}@s.whatsapp.net"
+            from_me = row[1] == "outbound"
+
+        data = fetch_media(media_id, remote_jid=remote_jid, from_me=from_me)
         b64 = data.get("base64", "")
         mimetype = data.get("mimetype", "application/octet-stream")
         if not b64:

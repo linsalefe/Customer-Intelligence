@@ -122,15 +122,21 @@ def get_profile_picture(number: str, instance_name: str = None) -> str | None:
         return None
 
 
-def fetch_media(media_id: str, instance_name: str = None) -> dict:
-    """Busca mídia pelo ID (para servir no frontend)."""
+def fetch_media(media_id: str, remote_jid: str = None, from_me: bool = False, instance_name: str = None) -> dict:
+    """Busca mídia pelo ID (para servir no frontend).
+    Requer remote_jid no formato '5511999999999@s.whatsapp.net'.
+    """
     name = instance_name or EVOLUTION_INSTANCE_NAME
+    key = {"id": media_id}
+    if remote_jid:
+        key["remoteJid"] = remote_jid if "@" in remote_jid else f"{remote_jid}@s.whatsapp.net"
+        key["fromMe"] = from_me
     try:
-        res = requests.get(
+        res = requests.post(
             f"{EVOLUTION_API_URL}/chat/getBase64FromMediaMessage/{name}",
             headers=HEADERS,
             timeout=30,
-            json={"message": {"key": {"id": media_id}}},
+            json={"message": {"key": key}},
         )
         return res.json()
     except Exception:
