@@ -248,8 +248,8 @@ export default function PipelinePage() {
         )}
 
         {/* Kanban Board */}
-        <div className="flex-1 overflow-x-auto overflow-y-hidden">
-          <div className="flex gap-3 p-4 h-full min-w-max">
+        <div className="flex-1 overflow-x-auto overflow-y-hidden min-h-0">
+          <div className="flex gap-3 p-4 h-full min-w-max items-stretch">
             {stages.map((stage) => {
               const stageContacts = getContactsByStage(stage);
               const key = getStageKey(stage);
