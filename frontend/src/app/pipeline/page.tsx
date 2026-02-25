@@ -197,7 +197,7 @@ export default function PipelinePage() {
 
   return (
     <AppLayout>
-      <div className="h-full flex flex-col bg-[#111b21]" style={{ marginTop: "-24px", marginLeft: "-24px", marginRight: "-24px", marginBottom: "-24px" }}>
+      <div className="flex flex-col bg-[#111b21]" style={{ marginTop: "-24px", marginLeft: "-24px", marginRight: "-24px", marginBottom: "-24px", minHeight: "calc(100vh - 0px)", height: "calc(100vh - 0px)" }}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a3942]">
           <div>
