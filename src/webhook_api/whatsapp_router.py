@@ -411,3 +411,61 @@ def instance_logout():
         return logout_instance()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# TEMPLATES DE MENSAGEM RÁPIDA
+# ============================================================
+
+@router.get("/templates")
+def list_templates(category: str = ""):
+    """Lista templates de mensagem rápida."""
+    conn = get_postgres_connection()
+    cursor = conn.cursor()
+
+    sql = "SELECT id, name, body, category FROM comm.wa_templates WHERE is_active = true"
+    params = []
+    if category:
+        sql += " AND category = %s"
+        params.append(category)
+    sql += " ORDER BY name"
+
+    cursor.execute(sql, params)
+    templates = [{"id": r[0], "name": r[1], "body": r[2], "category": r[3]} for r in cursor.fetchall()]
+
+    cursor.close()
+    conn.close()
+    return templates
+
+
+class CreateTemplateRequest(BaseModel):
+    name: str
+    body: str
+    category: str = "geral"
+
+@router.post("/templates")
+def create_template(req: CreateTemplateRequest):
+    """Cria template de mensagem rápida."""
+    conn = get_postgres_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO comm.wa_templates (name, body, category) VALUES (%s, %s, %s) RETURNING id",
+        (req.name, req.body, req.category)
+    )
+    new_id = cursor.fetchone()[0]
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"id": new_id, "status": "created"}
+
+
+@router.delete("/templates/{template_id}")
+def delete_template(template_id: int):
+    """Desativa um template."""
+    conn = get_postgres_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE comm.wa_templates SET is_active = false WHERE id = %s", (template_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"status": "deleted"}

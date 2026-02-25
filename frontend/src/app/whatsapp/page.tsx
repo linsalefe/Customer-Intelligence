@@ -82,6 +82,8 @@ export default function WhatsAppPage() {
   const [profilePics, setProfilePics] = useState<Record<string, string | null>>({});
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -103,9 +105,24 @@ export default function WhatsAppPage() {
     return () => clearInterval(interval);
   }, []);
 
+
+  const loadTemplates = async () => {
+    try {
+      const res = await api.get("/api/whatsapp/templates");
+      setTemplates(res.data);
+    } catch { /* silent */ }
+  };
+
+  const applyTemplate = (tpl: any, contact: Contact) => {
+    let text = tpl.body;
+    text = text.replace("{nome}", contact.name || "");
+    setNewMessage(text);
+    setShowTemplates(false);
+  };
   // Load contacts when connected
   useEffect(() => {
     if (instanceConnected) {
+      loadTemplates();
       loadContacts();
       const interval = setInterval(loadContacts, 5000);
       return () => clearInterval(interval);
@@ -618,6 +635,20 @@ export default function WhatsAppPage() {
                       <div className="flex items-end gap-2">
                         <div className="relative">
                           <button onClick={() => imageInputRef.current?.click()} className="p-2 rounded-full text-[#8696a0] hover:text-[#e9edef]"><Paperclip className="w-6 h-6" /></button>
+                        <div className="relative">
+                          <button onClick={() => setShowTemplates(!showTemplates)} className={`p-2 rounded-full transition-all ${showTemplates ? "text-[#00a884]" : "text-[#8696a0] hover:text-[#e9edef]"}`} title="Templates"><FileText className="w-5 h-5" /></button>
+                          {showTemplates && templates.length > 0 && (
+                            <div className="absolute bottom-12 left-0 z-50 bg-[#233138] rounded-xl border border-[#2a3942] shadow-xl min-w-[260px] max-h-[300px] overflow-y-auto">
+                              <div className="px-3 py-2 border-b border-[#2a3942]"><p className="text-[10px] font-semibold text-[#8696a0] uppercase tracking-wider">Templates</p></div>
+                              {templates.map((tpl: any) => (
+                                <button key={tpl.id} onClick={() => selectedContact && applyTemplate(tpl, selectedContact)} className="w-full text-left px-3 py-2.5 hover:bg-[#182229] transition-colors border-b border-[#2a3942]/50 last:border-0">
+                                  <p className="text-[13px] text-[#e9edef] font-medium">{tpl.name}</p>
+                                  <p className="text-[11px] text-[#8696a0] mt-0.5 truncate">{tpl.body}</p>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                           <input ref={imageInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "image"); e.target.value = ""; }} />
                         </div>
                         <textarea
