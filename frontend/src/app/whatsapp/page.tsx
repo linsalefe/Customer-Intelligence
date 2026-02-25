@@ -50,6 +50,10 @@ interface Message {
   timestamp: string;
   status: string;
   sent_by_ai: boolean;
+  media_id?: string;
+  media_mime?: string;
+  media_caption?: string;
+  message_type?: string;
 }
 
 const leadStatuses = [
