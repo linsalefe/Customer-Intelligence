@@ -8,7 +8,7 @@ Sistema completo de inteligência de clientes com deduplicação, métricas RFM,
 - **79.791 pedidos** processados (deduplicados)
 - **R$ 17,5M** em receita total (com conversão de 12 moedas)
 - **18.894 clientes ativos** nos últimos 365 dias
-- **Frontend completo** com 7 páginas interativas
+- **Frontend completo** com 8 páginas interativas
 - **Domínio:** https://cenatdata.online
 
 ## 🗃️ Fontes de Dados
@@ -58,7 +58,7 @@ Sistema completo de inteligência de clientes com deduplicação, métricas RFM,
        │
        ▼
 ┌─────────────┐
-│   Next.js   │  Frontend Dashboard (7 páginas)
+│   Next.js   │  Frontend Dashboard (8 páginas)
 └─────────────┘
 ```
 
@@ -73,6 +73,7 @@ Sistema completo de inteligência de clientes com deduplicação, métricas RFM,
 | Frontend | Next.js 14 + TypeScript + Tailwind CSS v4 + Recharts |
 | Infraestrutura | Docker + Docker Compose |
 | Servidor | AWS Lightsail (Ubuntu 24) |
+| WhatsApp | Evolution API (instância Farmer) |
 | SSL | Let's Encrypt (auto-renovação) |
 
 ## 📱 Páginas do Dashboard
@@ -86,6 +87,7 @@ Sistema completo de inteligência de clientes com deduplicação, métricas RFM,
 | **Receita** | Gráficos temporais de receita, pedidos e novos clientes |
 | **Cohort** | Análise de retenção e receita por cohort mensal |
 | **Usuários** | CRUD de usuários com perfis (Admin/Operacional/Viewer) |
+| **WhatsApp** | Chat em tempo real via Evolution API + CRM integrado |
 
 ## 🔍 Filtros da Página Clientes
 
@@ -168,6 +170,22 @@ docker-compose -f docker-compose.prod.yml up -d --build
 - **URL:** https://cenatdata.online
 - **SSL:** Let's Encrypt (renovação automática via certbot)
 
+## 📱 WhatsApp Business (Evolution API)
+
+### Funcionalidades
+- **Chat em tempo real** - Interface estilo WhatsApp Web com polling
+- **Webhook** - Recebe mensagens via Evolution API automaticamente
+- **Mídia** - Envio/recebimento de imagens, áudio, vídeo e documentos
+- **Templates** - Mensagens pré-definidas com variáveis ({nome})
+- **CRM integrado** - Painel lateral com dados do Customer 360 (LTV, pedidos, status)
+- **Lead management** - Status (Novo → Qualificado → Convertido), tags, notas
+- **Auto-link** - Vinculação automática com core.customer via telefone
+
+### Configuração
+- **Evolution API:** http://13.221.209.242:8080
+- **Instância:** Farmer
+- **Webhook:** https://cenatdata.online/api/whatsapp/webhook/Farmer
+
 ## 📊 Regras de Negócio
 
 ### Cliente Ativo
@@ -223,7 +241,8 @@ Customer-Intelligence/
 │   ├── auth/                # JWT + security
 │   ├── db/                  # Connection, loaders, sql_runner
 │   ├── transforms/          # Normalização
-│   ├── webhook_api/         # FastAPI routers
+│   ├── connectors/          # Evolution API, Comtele, Email
+│   ├── webhook_api/         # FastAPI routers + WhatsApp webhook
 │   └── settings.py
 └── requirements.txt
 ```
