@@ -597,19 +597,28 @@ export default function WhatsAppPage() {
                                   ) : (
                                     <span className="absolute -left-2 top-0 w-0 h-0 border-t-[8px] border-t-[#202c33] border-l-[8px] border-l-transparent" />
                                   )}
-                                  {msg.content.startsWith("media:") ? (
-                                    msg.type === "image" || msg.content.split("|")[1]?.startsWith("image") ? (
-                                      <img src={"https://cenatdata.online/api/whatsapp/media/" + msg.content.split("|")[0].replace("media:", "")} alt="" className="max-w-[280px] rounded-md cursor-pointer" onClick={() => window.open("https://cenatdata.online/api/whatsapp/media/" + msg.content.split("|")[0].replace("media:", ""), "_blank")} />
-                                    ) : msg.type === "audio" || msg.content.split("|")[1]?.startsWith("audio") ? (
-                                      <audio controls className="max-w-[280px]"><source src={"https://cenatdata.online/api/whatsapp/media/" + msg.content.split("|")[0].replace("media:", "")} /></audio>
-                                    ) : msg.type === "video" || msg.content.split("|")[1]?.startsWith("video") ? (
-                                      <video controls className="max-w-[280px] rounded-md"><source src={"https://cenatdata.online/api/whatsapp/media/" + msg.content.split("|")[0].replace("media:", "")} /></video>
-                                    ) : (
-                                      <a href={"https://cenatdata.online/api/whatsapp/media/" + msg.content.split("|")[0].replace("media:", "")} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[#53bdeb] underline text-sm">📄 {msg.content.split("|")[2] || "Documento"}</a>
-                                    )
-                                  ) : (
-                                    <p className="text-[14.2px] whitespace-pre-wrap break-words leading-[19px]">{msg.content}</p>
-                                  )}
+                                  {(() => {
+                                    const mediaId = msg.media_id;
+                                    const isMediaContent = msg.content?.startsWith("media:");
+                                    const msgType = msg.message_type || msg.type || "";
+                                    const isMedia = mediaId || isMediaContent || ["image","audio","video","document","sticker","ptt"].includes(msgType);
+                                    if (!isMedia) return <p className="text-[14.2px] whitespace-pre-wrap break-words leading-[19px]">{msg.content}</p>;
+                                    let mediaUrl = "";
+                                    if (mediaId && mediaId !== "sent") {
+                                      mediaUrl = `https://cenatdata.online/api/whatsapp/media/${mediaId}`;
+                                    } else if (isMediaContent) {
+                                      const eid = msg.content.split("|")[0].replace("media:", "");
+                                      if (eid && eid !== "sent") mediaUrl = `https://cenatdata.online/api/whatsapp/media/${eid}`;
+                                    }
+                                    const mime = msg.media_mime || (isMediaContent ? msg.content.split("|")[1] : "") || "";
+                                    const fname = isMediaContent ? (msg.content.split("|")[2] || "Arquivo") : (msg.media_caption || "Arquivo");
+                                    const dtype = msgType || (mime.startsWith("image") ? "image" : mime.startsWith("audio") ? "audio" : mime.startsWith("video") ? "video" : "document");
+                                    if (!mediaUrl) return <p className="text-[13px] italic text-[#8696a0]">📎 {fname} (enviado)</p>;
+                                    if (dtype === "image" || dtype === "sticker") return <img src={mediaUrl} alt="" className={dtype === "sticker" ? "w-32 h-32" : "max-w-[280px] rounded-md cursor-pointer"} onClick={() => window.open(mediaUrl, "_blank")} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />;
+                                    if (dtype === "audio" || dtype === "ptt") return <audio controls className="max-w-[280px]"><source src={mediaUrl} /></audio>;
+                                    if (dtype === "video") return <video controls className="max-w-[280px] rounded-md"><source src={mediaUrl} /></video>;
+                                    return <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[#53bdeb] underline text-sm">📄 {fname}</a>;
+                                  })()}
                                   <div className="flex items-center justify-end gap-1 mt-0.5">
                                     <span className={`text-[11px] ${msg.direction === "outbound" ? "text-[#ffffff99]" : "text-[#8696a0]"}`}>{formatTime(msg.timestamp)}</span>
                                     {msg.direction === "outbound" && getStatusIcon(msg.status)}
