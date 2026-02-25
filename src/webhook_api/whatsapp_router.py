@@ -469,3 +469,129 @@ def delete_template(template_id: int):
     cursor.close()
     conn.close()
     return {"status": "deleted"}
+
+
+# ============================================================
+# ENVIO DE MÍDIA
+# ============================================================
+
+class SendMediaRequest(BaseModel):
+    to: str
+    media_type: str
+    base64_data: str
+    filename: str
+    mimetype: str
+    caption: Optional[str] = ""
+
+@router.post("/send/media")
+def send_media_message(req: SendMediaRequest):
+    """Envia mídia pelo WhatsApp."""
+    try:
+        if req.media_type == "audio":
+            from src.connectors.evolution_client import send_audio as send_audio_fn
+            result = send_audio_fn(req.to, req.base64_data)
+        else:
+            result = send_media(
+                req.to, req.media_type, req.base64_data,
+                req.filename, req.mimetype, req.caption or ""
+            )
+
+        conn = get_postgres_connection()
+        cursor = conn.cursor()
+        msg_id = result.get("key", {}).get("id", "") if isinstance(result, dict) else ""
+        content = f"media:|{req.mimetype}|{req.filename}"
+        cursor.execute("""
+            INSERT INTO comm.wa_messages (wa_message_id, contact_wa_id, direction, message_type, content, timestamp, status)
+            VALUES (%s, %s, 'outbound', %s, %s, %s, 'sent')
+            ON CONFLICT (wa_message_id) DO NOTHING
+        """, (msg_id or f"media_{_now().timestamp()}", req.to, req.media_type, content, _now()))
+        cursor.execute("""
+            UPDATE comm.wa_contacts SET last_message = %s, last_message_time = %s,
+                last_direction = 'outbound', unread = 0, updated_at = %s WHERE wa_id = %s
+        """, (f"📎 {req.filename}", _now(), _now(), req.to))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"status": "sent", "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/media/{media_id}")
+def get_media_file(media_id: str):
+    """Proxy de mídia da Evolution API."""
+    from src.connectors.evolution_client import fetch_media
+    from fastapi.responses import Response
+    import base64
+    try:
+        data = fetch_media(media_id)
+        b64 = data.get("base64", "")
+        mimetype = data.get("mimetype", "application/octet-stream")
+        if not b64:
+            raise HTTPException(status_code=404, detail="Mídia não encontrada")
+        if ";base64," in b64:
+            b64 = b64.split(";base64,")[1]
+        binary = base64.b64decode(b64)
+        return Response(content=binary, media_type=mimetype)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# DADOS DO CUSTOMER 360 VINCULADO
+# ============================================================
+
+@router.get("/contacts/{wa_id}/customer")
+def get_customer_data(wa_id: str):
+    """Busca dados do Customer 360 vinculado ao contato WA."""
+    conn = get_postgres_connection()
+    cursor = conn.cursor()
+
+    # Buscar customer_id do contato
+    cursor.execute("SELECT customer_id FROM comm.wa_contacts WHERE wa_id = %s", (wa_id,))
+    row = cursor.fetchone()
+    if not row or not row[0]:
+        cursor.close()
+        conn.close()
+        return {"linked": False}
+
+    customer_id = row[0]
+
+    # Buscar dados do cliente
+    cursor.execute("""
+        SELECT c.customer_id, c.email_master, c.name_master, c.phone_master,
+               c.city, c.state,
+               m.total_orders, m.total_revenue, m.avg_ticket,
+               m.first_purchase_date, m.last_purchase_date,
+               m.days_since_last_purchase, m.is_active, m.recency_band
+        FROM core.customer c
+        LEFT JOIN metrics.customer_summary m ON c.customer_id = m.customer_id
+        WHERE c.customer_id = %s
+    """, (customer_id,))
+
+    r = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if not r:
+        return {"linked": False}
+
+    return {
+        "linked": True,
+        "customer_id": r[0],
+        "email": r[1],
+        "name": r[2],
+        "phone": r[3],
+        "city": r[4],
+        "state": r[5],
+        "total_orders": r[6] or 0,
+        "total_revenue": float(r[7] or 0),
+        "avg_ticket": float(r[8] or 0),
+        "first_purchase": r[9].isoformat() if r[9] else None,
+        "last_purchase": r[10].isoformat() if r[10] else None,
+        "days_since_purchase": r[11] or 0,
+        "is_active": r[12] or False,
+        "recency_band": r[13] or "Nunca comprou",
+    }

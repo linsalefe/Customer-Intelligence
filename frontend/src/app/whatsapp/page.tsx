@@ -81,6 +81,7 @@ export default function WhatsAppPage() {
   const [checkingConnection, setCheckingConnection] = useState(true);
   const [profilePics, setProfilePics] = useState<Record<string, string | null>>({});
   const [showScrollDown, setShowScrollDown] = useState(false);
+  const [customerData, setCustomerData] = useState<any>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -138,6 +139,7 @@ export default function WhatsAppPage() {
       loadMessages(selectedContact.wa_id);
       api.post(`/api/whatsapp/contacts/${selectedContact.wa_id}/read`).catch(() => {});
       setNotesValue(selectedContact.notes || "");
+      api.get("/api/whatsapp/contacts/" + selectedContact.wa_id + "/customer").then(function(res) { setCustomerData(res.data); }).catch(function() { setCustomerData(null); });
       const interval = setInterval(() => loadMessages(selectedContact.wa_id), 3000);
       return () => clearInterval(interval);
     }
@@ -634,7 +636,7 @@ export default function WhatsAppPage() {
                     ) : (
                       <div className="flex items-end gap-2">
                         <div className="relative">
-                          <button onClick={() => imageInputRef.current?.click()} className="p-2 rounded-full text-[#8696a0] hover:text-[#e9edef]"><Paperclip className="w-6 h-6" /></button>
+                          <div className="relative"><button onClick={() => { const m = document.getElementById("attach-menu"); if(m) m.classList.toggle("hidden"); }} className="p-2 rounded-full text-[#8696a0] hover:text-[#e9edef]"><Paperclip className="w-6 h-6" /></button><div id="attach-menu" className="hidden absolute bottom-12 left-0 z-50 bg-[#233138] rounded-xl border border-[#2a3942] shadow-xl min-w-[180px] overflow-hidden"><button onClick={() => { imageInputRef.current?.click(); document.getElementById("attach-menu")?.classList.add("hidden"); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#182229] transition-colors text-left"><div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center"><ImageIcon className="w-4 h-4 text-white" /></div><span className="text-[14px] text-[#e9edef]">Foto / Vídeo</span></button><button onClick={() => { fileInputRef.current?.click(); document.getElementById("attach-menu")?.classList.add("hidden"); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#182229] transition-colors text-left"><div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center"><FileText className="w-4 h-4 text-white" /></div><span className="text-[14px] text-[#e9edef]">Documento</span></button></div></div>
                         <div className="relative">
                           <button onClick={() => setShowTemplates(!showTemplates)} className={`p-2 rounded-full transition-all ${showTemplates ? "text-[#00a884]" : "text-[#8696a0] hover:text-[#e9edef]"}`} title="Templates"><FileText className="w-5 h-5" /></button>
                           {showTemplates && templates.length > 0 && (
@@ -696,6 +698,17 @@ export default function WhatsAppPage() {
                             Ver no Customer 360 →
                           </a>
                         )}
+                        {customerData && customerData.linked && (
+                          <div className="mt-3 bg-[#202c33] rounded-xl p-3 border border-[#2a3942] text-left">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div><p className="text-[10px] text-[#8696a0] uppercase">Pedidos</p><p className="text-[15px] font-semibold text-[#e9edef]">{customerData.total_orders}</p></div>
+                              <div><p className="text-[10px] text-[#8696a0] uppercase">LTV</p><p className="text-[15px] font-semibold text-[#00a884]">R$ {customerData.total_revenue?.toLocaleString("pt-BR", {minimumFractionDigits: 2})}</p></div>
+                              <div><p className="text-[10px] text-[#8696a0] uppercase">Ticket Médio</p><p className="text-[13px] text-[#e9edef]">R$ {customerData.avg_ticket?.toLocaleString("pt-BR", {minimumFractionDigits: 2})}</p></div>
+                              <div><p className="text-[10px] text-[#8696a0] uppercase">Status</p><p className={"text-[13px] font-medium " + (customerData.is_active ? "text-[#00a884]" : "text-red-400")}>{customerData.is_active ? "Ativo" : "Inativo"}</p></div>
+                              <div className="col-span-2"><p className="text-[10px] text-[#8696a0] uppercase">Recência</p><p className="text-[12px] text-[#e9edef]">{customerData.recency_band}</p></div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Lead Status */}
@@ -740,7 +753,8 @@ export default function WhatsAppPage() {
                             <textarea value={notesValue} onChange={(e) => setNotesValue(e.target.value)} rows={4} className="w-full px-3 py-2.5 text-[13px] text-[#e9edef] bg-[#2a3942] border border-[#3b4a54] rounded-xl outline-none focus:border-[#00a884] resize-none" placeholder="Notas sobre o lead..." />
                             <div className="flex gap-2 mt-2">
                               <button onClick={saveNotes} className="px-3.5 py-1.5 bg-[#00a884] text-[#111b21] text-[11px] font-medium rounded-lg">Salvar</button>
-                              <button onClick={() => { setEditingNotes(false); setNotesValue(selectedContact.notes || ""); }} className="px-3.5 py-1.5 text-[#8696a0] text-[11px] rounded-lg hover:bg-[#202c33]">Cancelar</button>
+                              <button onClick={() => { setEditingNotes(false); setNotesValue(selectedContact.notes || "");
+      api.get("/api/whatsapp/contacts/" + selectedContact.wa_id + "/customer").then(function(res) { setCustomerData(res.data); }).catch(function() { setCustomerData(null); }); }} className="px-3.5 py-1.5 text-[#8696a0] text-[11px] rounded-lg hover:bg-[#202c33]">Cancelar</button>
                             </div>
                           </div>
                         ) : (
