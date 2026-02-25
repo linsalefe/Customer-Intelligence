@@ -499,7 +499,7 @@ def send_media_message(req: SendMediaRequest):
         conn = get_postgres_connection()
         cursor = conn.cursor()
         msg_id = result.get("key", {}).get("id", "") if isinstance(result, dict) else ""
-        content = f"media:|{req.mimetype}|{req.filename}"
+        content = f"media:{msg_id or chr(39)sent{chr(39)}|{req.mimetype}|{req.filename}"
         cursor.execute("""
             INSERT INTO comm.wa_messages (wa_message_id, contact_wa_id, direction, message_type, content, timestamp, status)
             VALUES (%s, %s, 'outbound', %s, %s, %s, 'sent')
