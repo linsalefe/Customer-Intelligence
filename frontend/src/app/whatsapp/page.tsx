@@ -110,7 +110,6 @@ export default function WhatsAppPage() {
     return () => clearInterval(interval);
   }, []);
 
-
   const loadTemplates = async () => {
     try {
       const res = await api.get("/api/whatsapp/templates");
@@ -124,6 +123,7 @@ export default function WhatsAppPage() {
     setNewMessage(text);
     setShowTemplates(false);
   };
+
   // Load contacts when connected
   useEffect(() => {
     if (instanceConnected) {
@@ -659,10 +659,15 @@ export default function WhatsAppPage() {
                         <button onClick={stopRecording} className="w-[42px] h-[42px] bg-[#00a884] rounded-full text-white flex items-center justify-center"><Send className="w-5 h-5" /></button>
                       </div>
                     ) : (
-                      <div className="flex items-end gap-2">
-                        <div className="relative">
-                          <div className="relative"><button onClick={() => { const m = document.getElementById("attach-menu"); if(m) m.classList.toggle("hidden"); }} className="p-2 rounded-full text-[#8696a0] hover:text-[#e9edef]"><Paperclip className="w-6 h-6" /></button><div id="attach-menu" className="hidden absolute bottom-12 left-0 z-50 bg-[#233138] rounded-xl border border-[#2a3942] shadow-xl min-w-[180px] overflow-hidden"><button onClick={() => { imageInputRef.current?.click(); document.getElementById("attach-menu")?.classList.add("hidden"); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#182229] transition-colors text-left"><div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center"><ImageIcon className="w-4 h-4 text-white" /></div><span className="text-[14px] text-[#e9edef]">Foto / Vídeo</span></button><button onClick={() => { fileInputRef.current?.click(); document.getElementById("attach-menu")?.classList.add("hidden"); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#182229] transition-colors text-left"><div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center"><FileText className="w-4 h-4 text-white" /></div><span className="text-[14px] text-[#e9edef]">Documento</span></button></div></div>
-                        <div className="relative">
+                      <div className="flex items-end gap-1">
+                        <div className="flex items-center gap-0">
+                          <div className="relative">
+                            <button onClick={() => { const m = document.getElementById("attach-menu"); if(m) m.classList.toggle("hidden"); }} className="p-2 rounded-full text-[#8696a0] hover:text-[#e9edef]"><Paperclip className="w-5 h-5" /></button>
+                            <div id="attach-menu" className="hidden absolute bottom-12 left-0 z-50 bg-[#233138] rounded-xl border border-[#2a3942] shadow-xl min-w-[180px] overflow-hidden">
+                              <button onClick={() => { imageInputRef.current?.click(); document.getElementById("attach-menu")?.classList.add("hidden"); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#182229] transition-colors text-left"><div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center"><ImageIcon className="w-4 h-4 text-white" /></div><span className="text-[14px] text-[#e9edef]">Foto / Vídeo</span></button>
+                              <button onClick={() => { fileInputRef.current?.click(); document.getElementById("attach-menu")?.classList.add("hidden"); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#182229] transition-colors text-left"><div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center"><FileText className="w-4 h-4 text-white" /></div><span className="text-[14px] text-[#e9edef]">Documento</span></button>
+                            </div>
+                          </div>
                           <button onClick={() => setShowTemplates(!showTemplates)} className={`p-2 rounded-full transition-all ${showTemplates ? "text-[#00a884]" : "text-[#8696a0] hover:text-[#e9edef]"}`} title="Templates"><FileText className="w-5 h-5" /></button>
                           {showTemplates && templates.length > 0 && (
                             <div className="absolute bottom-12 left-0 z-50 bg-[#233138] rounded-xl border border-[#2a3942] shadow-xl min-w-[260px] max-h-[300px] overflow-y-auto">
@@ -676,15 +681,15 @@ export default function WhatsAppPage() {
                             </div>
                           )}
                         </div>
-                          <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.csv,.ppt,.pptx,.zip,.rar" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "document"); e.target.value = ""; }} />
-                        </div>
+                        <input ref={imageInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "image"); e.target.value = ""; }} />
+                        <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.csv,.ppt,.pptx,.zip,.rar" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "document"); e.target.value = ""; }} />
                         <textarea
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
                           onKeyDown={handleKeyPress}
                           placeholder="Digite uma mensagem"
                           rows={1}
-                          className="flex-1 px-3 py-2.5 bg-[#2a3942] rounded-lg text-[14px] text-[#e9edef] placeholder:text-[#8696a0] resize-none focus:outline-none"
+                          className="flex-1 px-3 py-2.5 bg-[#2a3942] rounded-lg text-[14px] text-white placeholder:text-[#8696a0] resize-none focus:outline-none"
                         />
                         {newMessage.trim() ? (
                           <button onClick={handleSend} disabled={sending} className="w-[42px] h-[42px] bg-[#00a884] rounded-full text-white flex items-center justify-center disabled:opacity-40">
