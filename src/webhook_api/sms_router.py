@@ -42,7 +42,7 @@ def send_sms_message(req: SendSmsRequest):
             req.customer_id,
             req.message,
             "sent" if result["success"] else "failed",
-            result.get("external_id", ""),
+            str(result.get("external_id", "")),
             result.get("error"),
             _now(),
         ))
