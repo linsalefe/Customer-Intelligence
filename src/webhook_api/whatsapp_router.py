@@ -212,23 +212,30 @@ def list_contacts(search: str = "", status: str = ""):
     cursor = conn.cursor()
 
     sql = """
-        SELECT wa_id, name, phone_normalized, customer_id, channel_name,
-               lead_status, notes, ai_active, last_message, last_message_time,
-               last_direction, unread, assigned_to, created_at, provider
-        FROM comm.wa_contacts
-        WHERE is_active = true
+        SELECT c.wa_id, c.name, c.phone_normalized, c.customer_id, c.channel_name,
+               c.lead_status, c.notes, c.ai_active, c.last_message, c.last_message_time,
+               c.last_direction, c.unread, c.assigned_to, c.created_at, c.provider,
+               u.name AS assignee_name,
+               COALESCE((
+                 SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color) ORDER BY t.name)
+                 FROM comm.contact_tags ct JOIN comm.tags t ON t.id = ct.tag_id
+                 WHERE ct.contact_wa_id = c.wa_id
+               ), '[]'::json) AS tags
+        FROM comm.wa_contacts c
+        LEFT JOIN core.users u ON u.id = c.assigned_to
+        WHERE c.is_active = true
     """
     params = []
 
     if search:
-        sql += " AND (name ILIKE %s OR wa_id LIKE %s)"
+        sql += " AND (c.name ILIKE %s OR c.wa_id LIKE %s)"
         params.extend([f'%{search}%', f'%{search}%'])
 
     if status and status != "todos":
-        sql += " AND lead_status = %s"
+        sql += " AND c.lead_status = %s"
         params.append(status)
 
-    sql += " ORDER BY last_message_time DESC NULLS LAST LIMIT 200"
+    sql += " ORDER BY c.last_message_time DESC NULLS LAST LIMIT 200"
 
     cursor.execute(sql, params)
     rows = cursor.fetchall()
@@ -245,12 +252,100 @@ def list_contacts(search: str = "", status: str = ""):
             "assigned_to": r[12],
             "created_at": r[13].isoformat() if r[13] else None,
             "provider": r[14],
-            "tags": [],
+            "assigned_to_name": r[15],
+            "tags": r[16] if r[16] else [],
         })
 
     cursor.close()
     conn.close()
     return contacts
+
+
+# ============================================================
+# TAGS DE CONTATO
+# ============================================================
+
+class CreateTagRequest(BaseModel):
+    name: str
+    color: str = "#888"
+
+
+@router.get("/tags")
+def list_tags():
+    conn = get_postgres_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, color FROM comm.tags ORDER BY name")
+    tags = [{"id": r[0], "name": r[1], "color": r[2]} for r in cursor.fetchall()]
+    cursor.close()
+    conn.close()
+    return tags
+
+
+@router.post("/tags")
+def create_tag(req: CreateTagRequest):
+    conn = get_postgres_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """INSERT INTO comm.tags (name, color) VALUES (%s, %s)
+           ON CONFLICT (name) DO UPDATE SET color = EXCLUDED.color
+           RETURNING id, name, color""",
+        (req.name.strip(), req.color),
+    )
+    r = cursor.fetchone()
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"id": r[0], "name": r[1], "color": r[2]}
+
+
+@router.post("/contacts/{wa_id}/tags/{tag_id}")
+def add_contact_tag(wa_id: str, tag_id: int):
+    conn = get_postgres_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO comm.contact_tags (contact_wa_id, tag_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+        (wa_id, tag_id),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"status": "ok"}
+
+
+@router.delete("/contacts/{wa_id}/tags/{tag_id}")
+def remove_contact_tag(wa_id: str, tag_id: int):
+    conn = get_postgres_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM comm.contact_tags WHERE contact_wa_id = %s AND tag_id = %s",
+        (wa_id, tag_id),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"status": "removed"}
+
+
+# ============================================================
+# ATRIBUIR CONVERSA A ATENDENTE
+# ============================================================
+
+class AssignRequest(BaseModel):
+    assigned_to: Optional[int] = None
+
+
+@router.patch("/contacts/{wa_id}/assign")
+def assign_contact(wa_id: str, req: AssignRequest):
+    conn = get_postgres_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE comm.wa_contacts SET assigned_to = %s, updated_at = %s WHERE wa_id = %s",
+        (req.assigned_to if req.assigned_to and req.assigned_to > 0 else None, _now(), wa_id),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"status": "assigned", "assigned_to": req.assigned_to}
 
 
 @router.get("/contacts/{wa_id}/messages")
@@ -500,28 +595,36 @@ def send_media_message(req: SendMediaRequest):
     """Envia mídia pelo WhatsApp (Evolution). Oficial avulso nao e suportado pela ponte."""
     try:
         if req.provider == "official":
-            raise HTTPException(
-                status_code=400,
-                detail="Envio oficial de midia avulsa nao suportado pela ponte; use disparo com template.",
-            )
-        if req.media_type == "audio":
-            from src.connectors.evolution_client import send_audio as send_audio_fn
-            result = send_audio_fn(req.to, req.base64_data)
+            # midia oficial via ponte (endpoint da S1.3 no Mensage)
+            try:
+                result = mensage_client.send_media(
+                    OFFICIAL_CHANNEL_ID, req.to, req.media_type, req.base64_data,
+                    req.mimetype, req.filename, req.caption or "",
+                )
+            except mensage_client.MensageError as e:
+                raise HTTPException(status_code=502, detail=f"Mensage falhou no envio de midia oficial: {e}")
+            msg_id = result.get("wa_message_id") if isinstance(result, dict) else None
+            provider = "official"
         else:
-            result = send_media(
-                req.to, req.media_type, req.base64_data,
-                req.filename, req.mimetype, req.caption or ""
-            )
+            if req.media_type == "audio":
+                from src.connectors.evolution_client import send_audio as send_audio_fn
+                result = send_audio_fn(req.to, req.base64_data)
+            else:
+                result = send_media(
+                    req.to, req.media_type, req.base64_data,
+                    req.filename, req.mimetype, req.caption or ""
+                )
+            msg_id = result.get("key", {}).get("id", "") if isinstance(result, dict) else ""
+            provider = "unofficial"
 
         conn = get_postgres_connection()
         cursor = conn.cursor()
-        msg_id = result.get("key", {}).get("id", "") if isinstance(result, dict) else ""
         content = f"media:{msg_id or 'sent'}|{req.mimetype}|{req.filename}"
         cursor.execute("""
             INSERT INTO comm.wa_messages (wa_message_id, contact_wa_id, direction, message_type, content, timestamp, status, provider)
-            VALUES (%s, %s, 'outbound', %s, %s, %s, 'sent', 'unofficial')
+            VALUES (%s, %s, 'outbound', %s, %s, %s, 'sent', %s)
             ON CONFLICT (wa_message_id) DO NOTHING
-        """, (msg_id or f"media_{_now().timestamp()}", req.to, req.media_type, content, _now()))
+        """, (msg_id or f"media_{_now().timestamp()}", req.to, req.media_type, content, _now(), provider))
         cursor.execute("""
             UPDATE comm.wa_contacts SET last_message = %s, last_message_time = %s,
                 last_direction = 'outbound', unread = 0, updated_at = %s WHERE wa_id = %s
@@ -529,7 +632,7 @@ def send_media_message(req: SendMediaRequest):
         conn.commit()
         cursor.close()
         conn.close()
-        return {"status": "sent", "result": result}
+        return {"status": "sent", "provider": provider, "result": result}
     except HTTPException:
         raise
     except Exception as e:

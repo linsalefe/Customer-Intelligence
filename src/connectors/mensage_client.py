@@ -59,6 +59,16 @@ def list_templates(channel_id: int) -> dict:
     return _get(f"/meta/channels/{channel_id}/templates")
 
 
+def send_media(channel_id: int, to: str, media_type: str, media_base64: str,
+               mime_type: str, filename: str, caption: str = "") -> dict:
+    """Envio de midia oficial via ponte (endpoint da S1.3 no Mensage)."""
+    return _post(
+        f"/meta/channels/{channel_id}/send-media",
+        {"to": to, "media_type": media_type, "media_base64": media_base64,
+         "mime_type": mime_type, "filename": filename, "caption": caption},
+    )
+
+
 def send_template(channel_id: int, to: str, template_name: str,
                   language_code: str, components: list) -> dict:
     return _post(
