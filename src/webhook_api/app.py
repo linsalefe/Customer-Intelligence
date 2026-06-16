@@ -16,6 +16,8 @@ from src.webhook_api.pipeline_router import router as pipeline_router
 from src.webhook_api.users_router import router as users_router
 from src.webhook_api.messaging_router import router as messaging_router
 from src.webhook_api.whatsapp_router import router as whatsapp_router
+from src.webhook_api.relay_router import router as relay_router
+from src.webhook_api.disparo_router import router as disparo_router
 
 app = FastAPI(title="Customer360 API")
 
@@ -32,6 +34,8 @@ app.include_router(dashboard_router)
 app.include_router(users_router)
 app.include_router(messaging_router)
 app.include_router(whatsapp_router)
+app.include_router(relay_router)
+app.include_router(disparo_router)
 app.include_router(pipeline_router)
 app.include_router(sms_router)
 

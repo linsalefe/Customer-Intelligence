@@ -19,6 +19,8 @@ from src.connectors.evolution_client import (
     logout_instance,
     get_profile_picture,
 )
+from src.connectors import mensage_client
+from src.settings import OFFICIAL_CHANNEL_ID
 
 router = APIRouter(prefix="/api/whatsapp", tags=["WhatsApp"])
 
@@ -212,7 +214,7 @@ def list_contacts(search: str = "", status: str = ""):
     sql = """
         SELECT wa_id, name, phone_normalized, customer_id, channel_name,
                lead_status, notes, ai_active, last_message, last_message_time,
-               last_direction, unread, assigned_to, created_at
+               last_direction, unread, assigned_to, created_at, provider
         FROM comm.wa_contacts
         WHERE is_active = true
     """
@@ -242,6 +244,7 @@ def list_contacts(search: str = "", status: str = ""):
             "last_direction": r[10], "unread": r[11] or 0,
             "assigned_to": r[12],
             "created_at": r[13].isoformat() if r[13] else None,
+            "provider": r[14],
             "tags": [],
         })
 
@@ -258,7 +261,7 @@ def get_messages(wa_id: str, limit: int = 100):
 
     cursor.execute("""
         SELECT id, wa_message_id, direction, message_type, content,
-               timestamp, status, sent_by_ai, sent_by
+               timestamp, status, sent_by_ai, sent_by, provider
         FROM comm.wa_messages
         WHERE contact_wa_id = %s
         ORDER BY timestamp ASC
@@ -272,7 +275,7 @@ def get_messages(wa_id: str, limit: int = 100):
             "type": r[3], "content": r[4],
             "timestamp": r[5].isoformat() if r[5] else None,
             "status": r[6], "sent_by_ai": r[7] or False,
-            "sent_by": r[8],
+            "sent_by": r[8], "provider": r[9],
         })
 
     cursor.close()
@@ -283,27 +286,33 @@ def get_messages(wa_id: str, limit: int = 100):
 class SendTextRequest(BaseModel):
     to: str
     text: str
+    provider: str = "unofficial"  # "official" (via Mensage) | "unofficial" (Evolution, default)
 
 @router.post("/send/text")
 def send_text_message(req: SendTextRequest):
-    """Envia mensagem de texto pelo WhatsApp."""
+    """Envia texto pelo WhatsApp. Roteia por provider: oficial via ponte Mensage, nao-oficial via Evolution."""
     try:
-        result = send_text(req.to, req.text)
+        if req.provider == "official":
+            try:
+                result = mensage_client.send_text(OFFICIAL_CHANNEL_ID, req.to, req.text)
+            except mensage_client.MensageError as e:
+                raise HTTPException(status_code=502, detail=f"Mensage falhou no envio oficial: {e}")
+            msg_id = result.get("wa_message_id") if isinstance(result, dict) else None
+            provider = "official"
+        else:
+            result = send_text(req.to, req.text)
+            msg_id = result.get("key", {}).get("id", "") if isinstance(result, dict) else None
+            provider = "unofficial"
 
         # Salvar no banco
         conn = get_postgres_connection()
         cursor = conn.cursor()
 
-        # Extrair message_id da resposta
-        msg_id = None
-        if isinstance(result, dict):
-            msg_id = result.get("key", {}).get("id", "")
-
         cursor.execute("""
-            INSERT INTO comm.wa_messages (wa_message_id, contact_wa_id, direction, message_type, content, timestamp, status)
-            VALUES (%s, %s, 'outbound', 'text', %s, %s, 'sent')
+            INSERT INTO comm.wa_messages (wa_message_id, contact_wa_id, direction, message_type, content, timestamp, status, provider)
+            VALUES (%s, %s, 'outbound', 'text', %s, %s, 'sent', %s)
             ON CONFLICT (wa_message_id) DO NOTHING
-        """, (msg_id or f"manual_{_now().timestamp()}", req.to, req.text, _now()))
+        """, (msg_id or f"manual_{_now().timestamp()}", req.to, req.text, _now(), provider))
 
         # Atualizar contato
         cursor.execute("""
@@ -317,7 +326,9 @@ def send_text_message(req: SendTextRequest):
         cursor.close()
         conn.close()
 
-        return {"status": "sent", "result": result}
+        return {"status": "sent", "provider": provider, "result": result}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -482,11 +493,17 @@ class SendMediaRequest(BaseModel):
     filename: str
     mimetype: str
     caption: Optional[str] = ""
+    provider: str = "unofficial"  # midia avulsa so via Evolution; oficial usa disparo/template
 
 @router.post("/send/media")
 def send_media_message(req: SendMediaRequest):
-    """Envia mídia pelo WhatsApp."""
+    """Envia mídia pelo WhatsApp (Evolution). Oficial avulso nao e suportado pela ponte."""
     try:
+        if req.provider == "official":
+            raise HTTPException(
+                status_code=400,
+                detail="Envio oficial de midia avulsa nao suportado pela ponte; use disparo com template.",
+            )
         if req.media_type == "audio":
             from src.connectors.evolution_client import send_audio as send_audio_fn
             result = send_audio_fn(req.to, req.base64_data)
@@ -501,8 +518,8 @@ def send_media_message(req: SendMediaRequest):
         msg_id = result.get("key", {}).get("id", "") if isinstance(result, dict) else ""
         content = f"media:{msg_id or 'sent'}|{req.mimetype}|{req.filename}"
         cursor.execute("""
-            INSERT INTO comm.wa_messages (wa_message_id, contact_wa_id, direction, message_type, content, timestamp, status)
-            VALUES (%s, %s, 'outbound', %s, %s, %s, 'sent')
+            INSERT INTO comm.wa_messages (wa_message_id, contact_wa_id, direction, message_type, content, timestamp, status, provider)
+            VALUES (%s, %s, 'outbound', %s, %s, %s, 'sent', 'unofficial')
             ON CONFLICT (wa_message_id) DO NOTHING
         """, (msg_id or f"media_{_now().timestamp()}", req.to, req.media_type, content, _now()))
         cursor.execute("""
@@ -513,6 +530,8 @@ def send_media_message(req: SendMediaRequest):
         cursor.close()
         conn.close()
         return {"status": "sent", "result": result}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
