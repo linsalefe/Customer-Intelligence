@@ -20,6 +20,16 @@ from src.connectors import mensage_client
 router = APIRouter(prefix="/api/disparo", tags=["disparo"])
 
 
+@router.get("/templates")
+def list_official_templates(user: dict = Depends(require_role("admin", "gestor", "operador"))):
+    """Proxy: lista templates aprovados do canal oficial no Mensage (pro picker do disparo)."""
+    try:
+        data = mensage_client.list_templates(OFFICIAL_CHANNEL_ID)
+    except mensage_client.MensageError as e:
+        raise HTTPException(status_code=502, detail=f"Mensage indisponivel: {e}")
+    return data
+
+
 class SegmentFilters(BaseModel):
     segment: Optional[str] = None          # "Ativo" | "Inativo"
     product: Optional[str] = None

@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   LayoutGrid,
   Kanban,
+  Megaphone,
 } from "lucide-react";
 
 interface NavItem {
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { label: "SMS", href: "/sms", icon: <MessageSquare className="w-5 h-5" />, roles: ["admin", "operacional"] },
   { label: "Pipeline", href: "/pipeline", icon: <Kanban className="w-5 h-5" />, roles: ["admin"] },
   { label: "WhatsApp", href: "/whatsapp", icon: <Smartphone className="w-5 h-5" />, roles: ["admin"] },
+  { label: "Disparo", href: "/disparo", icon: <Megaphone className="w-5 h-5" />, roles: ["admin"] },
   { label: "Usuários", href: "/usuarios", icon: <Settings className="w-5 h-5" />, roles: ["admin"] },
 ];
 

@@ -21,7 +21,6 @@ import {
   Image as ImageIcon,
   FileText,
   QrCode,
-  Wifi,
   WifiOff,
 } from "lucide-react";
 import AppLayout from "@/components/app-layout";
@@ -39,6 +38,7 @@ interface Contact {
   unread: number;
   created_at: string | null;
   assigned_to: number | null;
+  provider?: string | null;
 }
 
 interface Message {
@@ -54,7 +54,14 @@ interface Message {
   media_mime?: string;
   media_caption?: string;
   message_type?: string;
+  provider?: string | null;
 }
+
+// Selo de canal (oficial vs nao-oficial/Farmer)
+const providerBadge = (p?: string | null) =>
+  p === "official"
+    ? { label: "Oficial", cls: "bg-[#53bdeb]/20 text-[#53bdeb]" }
+    : { label: "Farmer", cls: "bg-amber-500/20 text-amber-400" };
 
 const leadStatuses = [
   { value: "novo", label: "Novo", color: "bg-blue-500", bg: "bg-blue-500/20", text: "text-blue-400" },
@@ -90,6 +97,7 @@ export default function WhatsAppPage() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [sendProvider, setSendProvider] = useState<"official" | "unofficial">("unofficial");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevMsgCountRef = useRef<number>(0);
@@ -143,6 +151,8 @@ export default function WhatsAppPage() {
       loadMessages(selectedContact.wa_id);
       api.post(`/api/whatsapp/contacts/${selectedContact.wa_id}/read`).catch(() => {});
       setNotesValue(selectedContact.notes || "");
+      // canal default de envio = canal do contato
+      setSendProvider(selectedContact.provider === "official" ? "official" : "unofficial");
       api.get("/api/whatsapp/contacts/" + selectedContact.wa_id + "/customer").then(function(res) { setCustomerData(res.data); }).catch(function() { setCustomerData(null); });
       const interval = setInterval(() => loadMessages(selectedContact.wa_id), 3000);
       return () => clearInterval(interval);
@@ -222,7 +232,7 @@ export default function WhatsAppPage() {
     if (!newMessage.trim() || !selectedContact || sending) return;
     setSending(true);
     try {
-      await api.post("/api/whatsapp/send/text", { to: selectedContact.wa_id, text: newMessage });
+      await api.post("/api/whatsapp/send/text", { to: selectedContact.wa_id, text: newMessage, provider: sendProvider });
       setNewMessage("");
       await loadMessages(selectedContact.wa_id);
       await loadContacts();
@@ -365,6 +375,13 @@ export default function WhatsAppPage() {
     else groupedMessages.push({ date, msgs: [msg] });
   });
 
+  // Janela de 24h (canal oficial): ultima inbound > 24h => texto livre pode falhar no Meta
+  const lastInbound = [...messages].reverse().find((m) => m.direction === "inbound");
+  const hoursSinceInbound = lastInbound
+    ? (Date.now() - new Date(lastInbound.timestamp).getTime()) / 3.6e6
+    : Infinity;
+  const officialWindowWarning = sendProvider === "official" && hoursSinceInbound > 24;
+
   // === QR CODE SCREEN ===
   if (checkingConnection) {
     return (
@@ -419,13 +436,20 @@ export default function WhatsAppPage() {
           <div className="px-4 py-3 space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 bg-[#00a884] rounded-full flex items-center justify-center">
-                  <Wifi className="w-4 h-4 text-white" />
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-10 h-10 bg-[#00a884] rounded-full flex items-center justify-center flex-shrink-0">
+                  <MessageCircle className="w-4 h-4 text-white" />
                 </div>
-                <div>
-                  <p className="text-[15px] font-medium text-[#e9edef]">WhatsApp Farmer</p>
-                  <p className="text-[12px] text-[#00a884]">● Conectado</p>
+                <div className="min-w-0">
+                  <p className="text-[15px] font-medium text-[#e9edef]">Inbox unificado</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="inline-flex items-center gap-1 text-[11px] text-[#53bdeb]" title="Canal oficial (Meta) ativo">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#53bdeb]" /> Oficial
+                    </span>
+                    <span className={`inline-flex items-center gap-1 text-[11px] ${instanceConnected ? "text-[#00a884]" : "text-red-400"}`} title="Instância Farmer (Evolution)">
+                      <span className={`w-1.5 h-1.5 rounded-full ${instanceConnected ? "bg-[#00a884]" : "bg-red-400"}`} /> Farmer {instanceConnected ? "" : "off"}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -547,6 +571,9 @@ export default function WhatsAppPage() {
                     <p className="font-normal text-[15px] text-[#e9edef]">{selectedContact.name || selectedContact.wa_id}</p>
                     <div className="flex items-center gap-2">
                       <span className="text-[12px] text-[#8696a0]">+{selectedContact.wa_id}</span>
+                      <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-md ${providerBadge(selectedContact.provider).cls}`}>
+                        {providerBadge(selectedContact.provider).label}
+                      </span>
                       <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-md ${getStatusConfig(selectedContact.lead_status).bg} ${getStatusConfig(selectedContact.lead_status).text}`}>
                         {getStatusConfig(selectedContact.lead_status).label}
                       </span>
@@ -644,6 +671,25 @@ export default function WhatsAppPage() {
 
                   {/* Input */}
                   <div className="px-3 py-2 bg-[#202c33]">
+                    {/* Seletor de canal de envio */}
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-[10px] text-[#8696a0] uppercase tracking-wider">Enviar por</span>
+                      <div className="flex rounded-lg overflow-hidden border border-[#2a3942]">
+                        <button
+                          onClick={() => setSendProvider("official")}
+                          className={`px-2.5 py-1 text-[11px] font-medium transition-all ${sendProvider === "official" ? "bg-[#53bdeb]/20 text-[#53bdeb]" : "text-[#8696a0] hover:bg-[#2a3942]"}`}
+                        >Oficial</button>
+                        <button
+                          onClick={() => setSendProvider("unofficial")}
+                          className={`px-2.5 py-1 text-[11px] font-medium transition-all ${sendProvider === "unofficial" ? "bg-amber-500/20 text-amber-400" : "text-[#8696a0] hover:bg-[#2a3942]"}`}
+                        >Farmer</button>
+                      </div>
+                    </div>
+                    {officialWindowWarning && (
+                      <div className="mb-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300">
+                        Última resposta há mais de 24h. No canal oficial, texto livre pode ser rejeitado pelo Meta — use um <span className="font-medium">template</span> (tela de Disparo).
+                      </div>
+                    )}
                     {isRecording ? (
                       <div className="flex items-center gap-3">
                         <button onClick={cancelRecording} className="p-2 rounded-full hover:bg-[#2a3942] text-red-400"><X className="w-5 h-5" /></button>
@@ -737,6 +783,12 @@ export default function WhatsAppPage() {
                               <div><p className="text-[10px] text-[#8696a0] uppercase">Status</p><p className={"text-[13px] font-medium " + (customerData.is_active ? "text-[#00a884]" : "text-red-400")}>{customerData.is_active ? "Ativo" : "Inativo"}</p></div>
                               <div className="col-span-2"><p className="text-[10px] text-[#8696a0] uppercase">Recência</p><p className="text-[12px] text-[#e9edef]">{customerData.recency_band}</p></div>
                             </div>
+                          </div>
+                        )}
+                        {customerData && !customerData.linked && !selectedContact.customer_id && (
+                          <div className="mt-3 bg-[#202c33] rounded-xl p-3 border border-[#2a3942] flex items-center justify-center gap-2">
+                            <User className="w-3.5 h-3.5 text-[#8696a0]" />
+                            <p className="text-[12px] text-[#8696a0]">Não vinculado a cliente</p>
                           </div>
                         )}
                       </div>

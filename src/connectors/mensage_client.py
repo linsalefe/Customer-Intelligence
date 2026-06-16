@@ -55,6 +55,10 @@ def send_text(channel_id: int, to: str, text: str) -> dict:
     return _post(f"/meta/channels/{channel_id}/send-text", {"to": to, "text": text})
 
 
+def list_templates(channel_id: int) -> dict:
+    return _get(f"/meta/channels/{channel_id}/templates")
+
+
 def send_template(channel_id: int, to: str, template_name: str,
                   language_code: str, components: list) -> dict:
     return _post(
